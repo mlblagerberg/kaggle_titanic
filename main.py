@@ -24,9 +24,18 @@ data["PassengerId"] = data["PassengerId"].astype(object)
 data[["LastName", "SuffixFirstName"]] = data["Name"].str.split(",", expand=True)
 data[["Suffix", "FirstName"]] = data["SuffixFirstName"].str.split(".", n=1, expand=True)
 data.drop(columns=["Name", "SuffixFirstName"], inplace=True)
+data["Ticket"] = data["Ticket"].str.replace(' ', '')
+data["Ticket"] = data["Ticket"].str.replace('/', '')
+data["Ticket"] = data["Ticket"].str.replace('.', '')
+data[["Ticket_Alpha", "Ticket_Number"]] = data["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
+
+# data["Ticket_Alpha"] = data["Ticket"].str.extract(r'([A-Za-z]+)')
+# data["Ticket_Number"] = data["Ticket"].str.extract(r'(\d+)')
+print(data[["Ticket", "Ticket_Alpha", "Ticket_Number"]])
+# data[["TicketSuffix", ]]
 # cabin_suffix = data["Cabin"].str[0]
 # data["CabinSuffix"] = cabin_suffix
-# print(data.head())
+print(data.head())
 # print(data.columns)
 # print(data.dtypes)
 # print(data.describe())
@@ -82,7 +91,11 @@ model = LogisticRegression()
 columns_with_null = data.columns[data.isna().any()].tolist()
 # print(f"Columns with nulls: {columns_with_null}")  # Age, Cabin, Embarked
 # print(data[data["Cabin"].isna()].describe())
-data["Sex"] = data["Sex"].astype(bool)
+# data["Sex"] = data["Sex"].astype(bool)
+missing_cabin_record = data[data["Cabin"].isna()]
+missing_cabin_record.to_csv("Data/missing_cabin.csv")
+
+# print(f"missing cabin: {missing_cabin_record}")
 # print(data.dtypes)
 # print(data[["Cabin", "Pclass"]].head(50))
 # print(len(data["Ticket"].unique()))
@@ -110,14 +123,14 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_
 
 preprocessor = ColumnTransformer(
     transformers=[
-        # ('lifeboat', OneHotEncoder(), ["Sex"]),
+        ('ship', OneHotEncoder(), ["Sex"]),
         # ('ice', OneHotEncoder(), ["Embarked"]),
         # ('burg', OneHotEncoder(handle_unknown="ignore"), ["Ticket"]),
         # ('white', OneHotEncoder(handle_unknown="ignore"), ["Cabin"]),
         ('lifeboat', StandardScaler(), ["Fare"]),
-        # ('ice', StandardScaler(), ["Parch"]),
-        # ('burg', StandardScaler(), ["SibSp"]),
-        # ('white', StandardScaler(), ["Age"]),
+        ('ice', StandardScaler(), ["Parch"]),
+        ('burg', StandardScaler(), ["SibSp"]),
+        ('white', StandardScaler(), ["Age"]),
         ('star', OneHotEncoder(handle_unknown="ignore"), ["Suffix"])
     ])
 
