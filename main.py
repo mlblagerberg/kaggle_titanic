@@ -26,7 +26,7 @@ print(data.head())
 # print(data.columns)
 # print(data.dtypes)
 # print(data.describe())
-
+# print(len(data[(data["Ticket"].isna())]))
 # -------------------------------------- INITIAL ANALYSIS ------------------------------------ #
 # From simple correlation analysis it looks like fair and class influenced survival the most. The higher the fare cost
 # the less likely you were to die, the lower the class (higher the numerical value) the lower the chance of survival. Of
@@ -48,35 +48,59 @@ children_data = data[(data["Age"] < 16) & (data["Parch"] != 0)]
 # print(children_data.describe())
 
 # -------------------------------------- BASELINE MODEL ------------------------------------ #
-# # Baseline only uses numerical features
-# base_data = data.dropna()
-# X = base_data[["Pclass", "Age", "SibSp", "Parch", "Fare"]].values
-# y = base_data["Survived"].values
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-# # print("Shape of X_train:", X_train.shape)
-#
-# model = LogisticRegression()
-# model.fit(X_train, y_train)
-#
-# # prediction
-# y_pred = model.predict(X_test)
-# accuracy = accuracy_score(y_test, y_pred)
-# print(f"Accuracy: {accuracy}")  # Accuracy: 0.7027027027027027
+# Baseline only uses numerical features
+base_data = data.dropna()
+features = ["Pclass", "Age", "SibSp", "Parch", "Fare"]
+X = (base_data[features]).values
+y = base_data["Survived"].values
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# print("Shape of X_train:", X_train.shape)
+
+model = LogisticRegression()
+model.fit(X_train, y_train)
+
+# prediction
+y_pred = model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy}")  # Accuracy: 0.7027027027027027
+
+coefficients = model.coef_[0]
+for feature, coef in zip(features, coefficients):
+    print(f"Feature {feature}: {coef}")
 
 # -------------------------------------- PREPROCESSING ------------------------------------ #
 columns_with_null = data.columns[data.isna().any()].tolist()
 # print(f"Columns with nulls: {columns_with_null}")  # Age, Cabin, Embarked
 # print(data[data["Cabin"].isna()].describe())
-data["Sex"] = data["Sex"].astype(bool)
+# data["Sex"] = data["Sex"].astype(bool)
 # print(data.dtypes)
 # print(data.head())
-# print(data["Ticket"].unique())
-# preprocessor = ColumnTransformer(
-#     transformers=[
-#         ('ice' OneHotEncoder(), ["Embarked"])
-#     ]
-#
-# )
+# print(len(data["Ticket"].unique()))
+features = ["Pclass", "Age", "SibSp", "Parch", "Fare", "Sex", "Embarked", "Ticket", "Cabin", "Suffix"]
+X = (base_data[features]) #.values
+y = base_data["Survived"] #.values
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        ('lifeboat', OneHotEncoder(), ["Sex"]),
+        # ('ice', OneHotEncoder(), ["Embarked"]),
+        # ('burg', OneHotEncoder(handle_unknown="ignore"), ["Ticket"]),
+        # ('white', OneHotEncoder(handle_unknown="ignore"), ["Cabin"]),
+        ('star', OneHotEncoder(handle_unknown="ignore"), ["Suffix"])
+    ])
+
+X_train_preprocessed = preprocessor.fit_transform(X_train)
+X_test_preprocessed = preprocessor.transform(X_test)
+
+model.fit(X_train_preprocessed, y_train)
+
+y_pred = model.predict(X_test_preprocessed)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy}")  # Accuracy: 0.6756756756756757
+# After removing Embarked, Ticket, and Cabin Accuracy is 0.8108108108108109
+
 
 
 # -------------------------------------- IMPUTE NULL AGE ------------------------------------ #
