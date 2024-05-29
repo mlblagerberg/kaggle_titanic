@@ -53,6 +53,7 @@ print(median_age_by_suffix)
 # -------------------------------------- BASELINE MODEL ------------------------------------ #
 # # Baseline only uses numerical features
 base_data = data.dropna()
+print(base_data.head(50))
 # miss_median_age = base_data.loc[data["Suffix"] == "Miss", "Age"].median(skipna=True)
 # print(miss_median_age)
 # features = ["Pclass", "Age", "SibSp", "Parch", "Fare"]
@@ -126,7 +127,8 @@ for feature, coef in zip(features, coefficients):
     print(f"Feature {feature}: {coef}")
 # print(data["Cabin"].unique())
 
-
+# plt.figure()
+# plt.scatter(base_data["Pclass"], base_data["Cabin"])
 
 # for column in data.columns:
 #     if column not in ["PassengerId", "Survived", "Name"]:
@@ -144,3 +146,17 @@ for feature, coef in zip(features, coefficients):
 #             plt.title(f"Survived vs {column}")
 
 # plt.show()
+
+test_data = pd.read_csv("Data/test.csv")
+test_data[["LastName", "SuffixFirstName"]] = test_data["Name"].str.split(",", expand=True)
+test_data[["Suffix", "FirstName"]] = test_data["SuffixFirstName"].str.split(".", n=1, expand=True)
+test_data.drop(columns=["Name", "SuffixFirstName"], inplace=True)
+X_test = test_data[features]
+X_test_preprocessed = preprocessor.transform(X_test)
+y_pred = model.predict(X_test_preprocessed)
+test_data["Survived"] = y_pred
+predictions = test_data[["PassengerId", "Survived"]]
+print(predictions)
+# accuracy = accuracy_score(y_test, y_pred)
+# print(f"Accuracy: {accuracy}")  # Accuracy: 0.6756756756756757
+
