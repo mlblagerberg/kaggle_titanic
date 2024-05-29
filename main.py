@@ -11,6 +11,7 @@ import pandas as pd
 import seaborn as sns
 from math import log
 from sklearn.compose import ColumnTransformer
+from sklearn.decomposition import PCA
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
@@ -79,6 +80,24 @@ family_score(data)
 # plt.title("Correlation Matrix")
 # plt.show()
 
+grouped = data.groupby(['TicketAlpha']).size().reset_index(name='count')
+filtered_groups = grouped[grouped['count'] > 2]
+merged_data = pd.merge(filtered_groups, data, on=['TicketAlpha'], how='inner')
+mean_survival_rate = merged_data.groupby(['TicketAlpha'])['Survived'].mean().reset_index(name='MeanSurvivalRate')
+low_survival = mean_survival_rate[mean_survival_rate["MeanSurvivalRate"] <= 0.40]
+low_survival_list = low_survival["TicketAlpha"].tolist()
+
+
+# def low_survival_tickets(row):
+#     if row["TicketAlpha"] in low_survival_list:
+#         return 1
+#     else:
+#         return 0
+#
+#
+# data["LowSurvival"] = data.apply(low_survival_tickets, axis=1)
+
+# print(data.head(50))
 # -------------------------------------- PREPROCESSING ------------------------------------ #
 
 
@@ -89,8 +108,8 @@ features = ["Pclass",
             "Fare",
             "FamilyScore",
             "Sex",
-            "TicketAlpha",
-            "Suffix"
+            "TicketAlpha"
+            # "LowSurvival"
             ]
 
 base_data = data #data.dropna()
@@ -100,8 +119,8 @@ y = base_data["Survived"] #.values
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=44)
 average_column = data.groupby('TicketAlpha')['Survived'].mean().reset_index()
 
-low_survival = average_column[(average_column["Survived"] <= (1/3))]
-high_survival = average_column[(average_column["Survived"] >= (2/3))]
+# low_survival = average_column[(average_column["Survived"] <= (1/3))]
+# high_survival = average_column[(average_column["Survived"] >= (2/3))]
 # print("Low survival")
 # print(low_survival["TicketAlpha"].tolist())
 # print("High survival")
@@ -124,13 +143,27 @@ preprocessor = ColumnTransformer(
         ('ice', StandardScaler(), ["Parch"]),
         ('burg', StandardScaler(), ["SibSp"]),
         ('white', StandardScaler(), ["Age"]),
-        ('star', OneHotEncoder(handle_unknown="ignore"), ["Suffix"])
+        # ('star', StandardScaler(), ["LowSurvival"])
     ],
     remainder='passthrough'  # Keep any remaining columns not specified in transformers as they are
 )
 
 X_train_preprocessed = preprocessor.fit_transform(X_train)
 X_test_preprocessed = preprocessor.transform(X_test)
+
+
+pca = PCA()
+X_pca = pca.fit_transform(X_train_preprocessed)
+
+# Fit PCA to the preprocessed training data
+pca.fit(X_train_preprocessed)
+
+# Transform the preprocessed training and test data using the fitted PCA
+X_train_pca = pca.transform(X_train_preprocessed)
+X_test_pca = pca.transform(X_test_preprocessed)
+
+explained_variance_ratio = pca.explained_variance_ratio_
+print("Explained Variance Ratio:", explained_variance_ratio)
 
 # -------------------------------------- LOGISTIC REGRESSION FIT ------------------------------------ #
 model = LogisticRegression()
@@ -160,16 +193,17 @@ rf_y_pred = rf.predict(X_test_preprocessed)
 rf_accuracy = accuracy_score(y_test, rf_y_pred)
 print(f"Random Forest Accuracy: {rf_accuracy}")
 
-plt.figure()
-mean_score = base_data["FamilyScore"].mean()
-plt.scatter(base_data["FamilyScore"], base_data["Survived"])
-plt.show()
+# plt.figure()
+# mean_score = base_data["FamilyScore"].mean()
+# plt.scatter(base_data["FamilyScore"], base_data["Survived"])
+# plt.show()
 
 
 test_data = pd.read_csv("Data/test.csv")
 data_processing(test_data)
 impute_age(test_data)
 family_score(test_data)
+# test_data["LowSurvival"] = test_data.apply(low_survival_tickets, axis=1)
 
 X_test = test_data[features]
 X_test_preprocessed = preprocessor.transform(X_test)
