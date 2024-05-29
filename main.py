@@ -9,6 +9,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from math import log
 from sklearn.compose import ColumnTransformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.tree import DecisionTreeClassifier
@@ -22,6 +23,7 @@ data = pd.read_csv("Data/train.csv")
 # data["Survived"] = data["Survived"].astype(bool)
 median_age = data["Age"].median()  # 28
 median_fare = data["Fare"].median()
+# print(data.describe())
 
 
 def data_processing(data_frame):
@@ -39,6 +41,8 @@ def data_processing(data_frame):
     data_frame["TicketAlpha"] = data_frame["TicketAlpha"].str.upper()
     data_frame["TicketAlpha"] = data_frame["TicketAlpha"].fillna("NONE")
 
+    # data["FamilyScore"] =
+
 
 data_processing(data)
 median_age_by_suffix = data.groupby("Suffix")["Age"].median()
@@ -50,6 +54,17 @@ def impute_age(data_frame):
 
 
 impute_age(data)
+# print(data.dtypes)
+
+
+def family_score(data_frame):
+    data_frame["FamilyScore"] = ((((data_frame["SibSp"] + 1) / (data_frame["Parch"] + 1)) / data_frame["Age"])
+                                 * data_frame["Pclass"])
+    # print(data_frame.sort_values("FamilyScore"))
+
+
+family_score(data)
+# data.to_csv("Data/processed_train.csv")
 
 # -------------------------------------- BASIC ANALYSIS ------------------------------------ #
 # From simple correlation analysis it looks like fare and class influenced survival the most. The higher the fare cost
@@ -65,11 +80,14 @@ impute_age(data)
 # plt.show()
 
 # -------------------------------------- PREPROCESSING ------------------------------------ #
+
+
 features = ["Pclass",
             "Age",
             "SibSp",
             "Parch",
             "Fare",
+            "FamilyScore",
             "Sex",
             "TicketAlpha",
             "Suffix"
@@ -101,6 +119,7 @@ preprocessor = ColumnTransformer(
         ('ship', OneHotEncoder(handle_unknown="ignore"), ["Sex"]),
         ('sink', encoder, ["TicketAlpha"]),
         # ('sink', OneHotEncoder(handle_unknown="ignore"), ["TicketAlpha"]),
+        ('nomen', StandardScaler(), ["FamilyScore"]),
         ('lifeboat', StandardScaler(), ["Fare"]),
         ('ice', StandardScaler(), ["Parch"]),
         ('burg', StandardScaler(), ["SibSp"]),
@@ -141,14 +160,16 @@ rf_y_pred = rf.predict(X_test_preprocessed)
 rf_accuracy = accuracy_score(y_test, rf_y_pred)
 print(f"Random Forest Accuracy: {rf_accuracy}")
 
-# plt.figure()
-# plt.scatter(base_data["Pclass"], base_data["TicketAlpha"])
-# plt.show()
+plt.figure()
+mean_score = base_data["FamilyScore"].mean()
+plt.scatter(base_data["FamilyScore"], base_data["Survived"])
+plt.show()
 
 
 test_data = pd.read_csv("Data/test.csv")
 data_processing(test_data)
 impute_age(test_data)
+family_score(test_data)
 
 X_test = test_data[features]
 X_test_preprocessed = preprocessor.transform(X_test)
