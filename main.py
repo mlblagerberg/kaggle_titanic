@@ -32,6 +32,9 @@ data.drop(columns=["Name", "SuffixFirstName"], inplace=True)
 # the less likely you were to die, the lower the class (higher the numerical value) the lower the chance of survival. Of
 # course these two variables are also highly correlated. As are parch and sibsp
 median_age = data["Age"].median()  # 28
+median_age_by_suffix = data.groupby("Suffix")["Age"].median()
+print("Median age by suffix:")
+print(median_age_by_suffix)
 # print(median_age)
 
 # Correlation matrix
@@ -43,13 +46,15 @@ median_age = data["Age"].median()  # 28
 # plt.show()
 
 # 72.73% of children traveling with nannies survived vs 57% of children traveling with a family member
-children_data = data[(data["Age"] < 16) & (data["Parch"] != 0)]
+# children_data = data[(data["Age"] < 16) & (data["Parch"] != 0)]
 # print(sum(children_data["Survived"])/len(children_data["Survived"]))
 # print(children_data.describe())
 
 # -------------------------------------- BASELINE MODEL ------------------------------------ #
 # # Baseline only uses numerical features
 base_data = data.dropna()
+# miss_median_age = base_data.loc[data["Suffix"] == "Miss", "Age"].median(skipna=True)
+# print(miss_median_age)
 # features = ["Pclass", "Age", "SibSp", "Parch", "Fare"]
 # X = (base_data[features]).values
 # y = base_data["Survived"].values
@@ -69,90 +74,57 @@ model = LogisticRegression()
 #     print(f"Feature {feature}: {coef}")
 
 # -------------------------------------- PREPROCESSING ------------------------------------ #
-# columns_with_null = data.columns[data.isna().any()].tolist()
-# # print(f"Columns with nulls: {columns_with_null}")  # Age, Cabin, Embarked
-# # print(data[data["Cabin"].isna()].describe())
-# data["Sex"] = data["Sex"].astype(bool)
-# # print(data.dtypes)
-# # print(data[["Cabin", "Pclass"]].head(50))
-# # print(len(data["Ticket"].unique()))
-# features = ["Pclass",
-#             "Age",
-#             "SibSp",
-#             "Parch",
-#             "Fare",
-#             "Sex",
-#             # "Embarked",
-#             # "Ticket",
-#             # "Cabin",
-#             "Suffix"
-#             ]
-# X = (base_data[features]) #.values
-# y = base_data["Survived"] #.values
-#
-# X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-#
-# preprocessor = ColumnTransformer(
-#     transformers=[
-#         # ('lifeboat', OneHotEncoder(), ["Sex"]),
-#         # ('ice', OneHotEncoder(), ["Embarked"]),
-#         # ('burg', OneHotEncoder(handle_unknown="ignore"), ["Ticket"]),
-#         # ('white', OneHotEncoder(handle_unknown="ignore"), ["Cabin"]),
-#         ('star', OneHotEncoder(handle_unknown="ignore"), ["Suffix"])
-#     ])
-#
-# X_train_preprocessed = preprocessor.fit_transform(X_train)
-# X_test_preprocessed = preprocessor.transform(X_test)
-#
-# model.fit(X_train_preprocessed, y_train)
-#
-# y_pred = model.predict(X_test_preprocessed)
-# accuracy = accuracy_score(y_test, y_pred)
-# print(f"Accuracy: {accuracy}")  # Accuracy: 0.6756756756756757
-# # **************** After removing Embarked, Ticket, and Cabin Accuracy is 0.8108108108108109 **************** #
-#
-# coefficients = model.coef_[0]
-# for feature, coef in zip(features, coefficients):
-#     print(f"Feature {feature}: {coef}")
+columns_with_null = data.columns[data.isna().any()].tolist()
+# print(f"Columns with nulls: {columns_with_null}")  # Age, Cabin, Embarked
+# print(data[data["Cabin"].isna()].describe())
+data["Sex"] = data["Sex"].astype(bool)
+# print(data.dtypes)
+# print(data[["Cabin", "Pclass"]].head(50))
+# print(len(data["Ticket"].unique()))
+# Impute age based of suffix median doesn't add value to test performance
+# missing_age_mask = data["Age"].isna()
+# data.loc[missing_age_mask, "Age"] = data.loc[missing_age_mask, "Suffix"].map(median_age_by_suffix)
+# base_data = data.dropna()
+
+features = ["Pclass",
+            "Age",
+            "SibSp",
+            "Parch",
+            "Fare",
+            "Sex",
+            # "Embarked",
+            # "Ticket",
+            # "Cabin",
+            "Suffix"
+            ]
+X = (base_data[features]) #.values
+y = base_data["Survived"] #.values
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+preprocessor = ColumnTransformer(
+    transformers=[
+        # ('lifeboat', OneHotEncoder(), ["Sex"]),
+        # ('ice', OneHotEncoder(), ["Embarked"]),
+        # ('burg', OneHotEncoder(handle_unknown="ignore"), ["Ticket"]),
+        # ('white', OneHotEncoder(handle_unknown="ignore"), ["Cabin"]),
+        ('star', OneHotEncoder(handle_unknown="ignore"), ["Suffix"])
+    ])
+
+X_train_preprocessed = preprocessor.fit_transform(X_train)
+X_test_preprocessed = preprocessor.transform(X_test)
+
+model.fit(X_train_preprocessed, y_train)
+
+y_pred = model.predict(X_test_preprocessed)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Accuracy: {accuracy}")  # Accuracy: 0.6756756756756757
+# **************** After removing Embarked, Ticket, and Cabin Accuracy is 0.8108108108108109 **************** #
+
+coefficients = model.coef_[0]
+for feature, coef in zip(features, coefficients):
+    print(f"Feature {feature}: {coef}")
 # print(data["Cabin"].unique())
-# -------------------------------------- IMPUTE NULL AGE ------------------------------------ #
-null_age = data[data["Age"].isna()]
-null_age_has_family = null_age[(null_age["SibSp"] != 0) | (null_age["Parch"] != 0)]
-
-# print(null_age.describe())
-# print(null_age_with_family.describe())
-
-null_age_with_family = pd.merge(data, null_age_has_family, on="LastName", how="inner")
-# filtered_null_age_family = null_age_with_family[null_age_with_family["FirstName_x"] !=
-#                                                 null_age_with_family["FirstName_y"]]
-sorted_null_age_family = null_age_with_family.sort_values(by="LastName").drop_duplicates()
-columns = ["PassengerId", "LastName", "Suffix_y", "FirstName_y", "Age_y", "Sex_y",
-           "Suffix_x", "FirstName_x", "Age_x", "Sex_x"]
-filtered_null_age = sorted_null_age_family[sorted_null_age_family.columns.intersection(columns)]
-# sorted_null_age_family.drop(columns)
-# print(sorted_null_age_family.columns)
-# print(sorted_null_age_family[["LastName", "Suffix_x", "FirstName_x", "Age_x", "Sex_x",
-#                               "Suffix_y", "FirstName_y", "Age_y", "Sex_y"]])
-
-# Now that we have those missing ages that have relatives onboard we can guess the missing ages based on the relatives
-# For each last name if there are children and the suffix of the people missing ages are Mr or Mrs, we will replace with
-# the median age plus the child's age. If the person missing an age is an adult and their suffix is Mr/Mrs and the other
-# person onboard has an opposite suffix we will assume they are married or siblings if female age will be males - XX. If
-# same suffix then check if parch or sibsp are non-zero, if parch then assume mother/daugther - if sibsp and suffix is
-# miss assume siblings. For mother/daughter if age is greater than median, replace other with their age - median age. If
-# sibling then based on if the age is greater or less than median we will subtract or add 2 years.
-
-last_names = sorted_null_age_family["LastName"].unique()
-# print(last_names)
-
-for name in last_names:
-    print(f"{filtered_null_age[filtered_null_age['LastName'] == name]}\n")
-
-
-
-
-
-
 
 
 
