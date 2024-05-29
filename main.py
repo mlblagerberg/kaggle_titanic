@@ -27,15 +27,14 @@ data.drop(columns=["Name", "SuffixFirstName"], inplace=True)
 data["Ticket"] = data["Ticket"].str.replace(' ', '')
 data["Ticket"] = data["Ticket"].str.replace('/', '')
 data["Ticket"] = data["Ticket"].str.replace('.', '')
-data[["Ticket_Alpha", "Ticket_Number"]] = data["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
-data["Ticket_Alpha"] = data["Ticket_Alpha"].str.upper()
-# data["Ticket_Alpha"] = data["Ticket"].str.extract(r'([A-Za-z]+)')
-# data["Ticket_Number"] = data["Ticket"].str.extract(r'(\d+)')
-print(data[["Ticket", "Ticket_Alpha", "Ticket_Number"]])
-# data[["TicketSuffix", ]]
+data[["TicketAlpha", "TicketNumber"]] = data["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
+data["TicketAlpha"] = data["TicketAlpha"].str.upper()
+data["TicketAlpha"] = data["TicketAlpha"].fillna("NONE")
+data.to_csv("Data/preprocessed_train.csv")
+
 # cabin_suffix = data["Cabin"].str[0]
 # data["CabinSuffix"] = cabin_suffix
-print(data.head())
+# print(data.head())
 # print(data.columns)
 # print(data.dtypes)
 # print(data.describe())
@@ -46,9 +45,10 @@ print(data.head())
 # course these two variables are also highly correlated. As are parch and sibsp
 median_age = data["Age"].median()  # 28
 median_age_by_suffix = data.groupby("Suffix")["Age"].median()
-# print("Median age by suffix:")
-# print(median_age_by_suffix)
-# print(median_age)
+missing_age_mask = data["Age"].isna()
+data.loc[missing_age_mask, "Age"] = data.loc[missing_age_mask, "Suffix"].map(median_age_by_suffix)
+# class_survival_rate = data.groupby(["Pclass", "TicketAlpha"])["Survived"].mean()
+# print(f"Survival rate by class: \n{class_survival_rate}")
 
 # Correlation matrix
 # numerical_data = data.select_dtypes(include=["int", "float"])
@@ -58,14 +58,9 @@ median_age_by_suffix = data.groupby("Suffix")["Age"].median()
 # plt.title("Correlation Matrix")
 # plt.show()
 
-# 72.73% of children traveling with nannies survived vs 57% of children traveling with a family member
-# children_data = data[(data["Age"] < 16) & (data["Parch"] != 0)]
-# print(sum(children_data["Survived"])/len(children_data["Survived"]))
-# print(children_data.describe())
-
 # -------------------------------------- BASELINE MODEL ------------------------------------ #
 # # Baseline only uses numerical features
-base_data = data.dropna()
+# base_data = data.dropna()
 # print(base_data.head(50))
 # miss_median_age = base_data.loc[data["Suffix"] == "Miss", "Age"].median(skipna=True)
 # print(miss_median_age)
@@ -88,54 +83,71 @@ model = LogisticRegression()
 #     print(f"Feature {feature}: {coef}")
 
 # -------------------------------------- PREPROCESSING ------------------------------------ #
-columns_with_null = data.columns[data.isna().any()].tolist()
-# print(f"Columns with nulls: {columns_with_null}")  # Age, Cabin, Embarked
-# print(data[data["Cabin"].isna()].describe())
-# data["Sex"] = data["Sex"].astype(bool)
-missing_cabin_record = data[data["Cabin"].isna()]
-missing_cabin_record.to_csv("Data/missing_cabin.csv")
-
-# print(f"missing cabin: {missing_cabin_record}")
-# print(data.dtypes)
-# print(data[["Cabin", "Pclass"]].head(50))
-# print(len(data["Ticket"].unique()))
-# Impute age based of suffix median doesn't add value to test performance
-# missing_age_mask = data["Age"].isna()
-# data.loc[missing_age_mask, "Age"] = data.loc[missing_age_mask, "Suffix"].map(median_age_by_suffix)
-# base_data = data.dropna()
-
 features = ["Pclass",
             "Age",
             "SibSp",
             "Parch",
             "Fare",
             "Sex",
+            "TicketAlpha",
+            # "TicketNumber",
+            # "LastName",
             # "CabinSuffix",
             # "Embarked",
             # "Ticket",
             # "Cabin",
             "Suffix"
             ]
+
+base_data = data #data.dropna()
 X = (base_data[features]) #.values
 y = base_data["Survived"] #.values
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=44)
+average_column = data.groupby('TicketAlpha')['Survived'].mean().reset_index()
+# print(average_column)
+# categories_to_keep = average_column[(average_column["Survived"] < (1/3)) | (average_column["Survived"] > (2/3))]
+# categories_to_keep = categories_to_keep["TicketAlpha"].tolist()
+# print(categories_to_keep)
+low_survival = average_column[(average_column["Survived"] <= (1/3))]
+high_survival = average_column[(average_column["Survived"] >= (2/3))]
+# print("Low survival")
+# print(low_survival["TicketAlpha"].tolist())
+# print("High survival")
+# print(high_survival["TicketAlpha"].tolist())
+
+encoder = OneHotEncoder(drop='first', handle_unknown="ignore")
+encoder.fit(data[["TicketAlpha"]])
+# indices_to_keep = data[data["TicketAlpha"].isin(categories_to_keep)].index
+encoded_data = encoder.transform(data[["TicketAlpha"]])
+# encoded_data_filtered = encoded_data[indices_to_keep]
+# print(encoded_data_filtered)
 
 preprocessor = ColumnTransformer(
     transformers=[
-        ('ship', OneHotEncoder(), ["Sex"]),
-        # ('ice', OneHotEncoder(), ["Embarked"]),
-        # ('burg', OneHotEncoder(handle_unknown="ignore"), ["Ticket"]),
-        # ('white', OneHotEncoder(handle_unknown="ignore"), ["Cabin"]),
+        ('ship', OneHotEncoder(handle_unknown="ignore"), ["Sex"]),
+        ('sink', encoder, ["TicketAlpha"]),
+        # ('sink', OneHotEncoder(handle_unknown="ignore"), ["TicketAlpha"]),
         ('lifeboat', StandardScaler(), ["Fare"]),
         ('ice', StandardScaler(), ["Parch"]),
         ('burg', StandardScaler(), ["SibSp"]),
         ('white', StandardScaler(), ["Age"]),
         ('star', OneHotEncoder(handle_unknown="ignore"), ["Suffix"])
-    ])
+    ],
+    remainder='passthrough'  # Keep any remaining columns not specified in transformers as they are
+)
+
+# base_data_transformed = preprocessor.fit_transform(base_data)
+# print(base_data_transformed[0])
+# base_data_processed = base_data_transformed[indices_to_keep]
+# print(base_data_processed)
 
 X_train_preprocessed = preprocessor.fit_transform(X_train)
+# X_train_preprocessed = X_train_preprocessed.dropna()
+# print(pd.DataFrame(X_train_preprocessed))
 X_test_preprocessed = preprocessor.transform(X_test)
+
+
 
 # -------------------------------------- LOGISTIC REGRESSION FIT ------------------------------------ #
 model.fit(X_train_preprocessed, y_train)
@@ -165,7 +177,7 @@ rf_accuracy = accuracy_score(y_test, rf_y_pred)
 print(f"Random Forest Accuracy: {rf_accuracy}")
 
 # plt.figure()
-# plt.scatter(base_data["Survived"], base_data["CabinSuffix"])
+# plt.scatter(base_data["Survived"], base_data["TicketAlpha"])
 
 # for column in data.columns:
 #     if column not in ["PassengerId", "Survived", "Name"]:
@@ -184,6 +196,7 @@ print(f"Random Forest Accuracy: {rf_accuracy}")
 
 # plt.show()
 
+
 test_data = pd.read_csv("Data/test.csv")
 median_fare = data["Fare"].median()
 test_data["Fare"] = test_data["Fare"].fillna(median_fare)
@@ -193,16 +206,23 @@ test_data[["Suffix", "FirstName"]] = test_data["SuffixFirstName"].str.split(".",
 test_data.drop(columns=["Name", "SuffixFirstName"], inplace=True)
 missing_age_mask = test_data["Age"].isna()
 test_data.loc[missing_age_mask, "Age"] = test_data.loc[missing_age_mask, "Suffix"].map(median_age_by_suffix)
-print(test_data.describe())
+test_data["Ticket"] = test_data["Ticket"].str.replace(' ', '')
+test_data["Ticket"] = test_data["Ticket"].str.replace('/', '')
+test_data["Ticket"] = test_data["Ticket"].str.replace('.', '')
+test_data[["TicketAlpha", "TicketNumber"]] = test_data["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
+test_data["TicketAlpha"] = test_data["TicketAlpha"].str.upper()
+test_data["TicketAlpha"] = test_data["TicketAlpha"].fillna("NONE")
+# print(test_data.describe())
 X_test = test_data[features]
 X_test_preprocessed = preprocessor.transform(X_test)
 
 # y_pred = model.predict(X_test_preprocessed)
-y_pred = rf.predict(X_test_preprocessed)
-test_data["Survived"] = y_pred
-predictions = test_data[["PassengerId", "Survived"]]
-print(predictions)
-predictions.to_csv("Data/submission.csv")
+# y_pred = rf.predict(X_test_preprocessed)
+# test_data["Survived"] = y_pred
+# predictions = test_data[["PassengerId", "Survived"]]
+# print(predictions)
+# predictions.to_csv("Data/submission.csv")
 # accuracy = accuracy_score(y_test, y_pred)
 # print(f"Accuracy: {accuracy}")  # Accuracy: 0.6756756756756757
+
 
