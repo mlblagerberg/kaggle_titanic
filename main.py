@@ -28,7 +28,7 @@ data["Ticket"] = data["Ticket"].str.replace(' ', '')
 data["Ticket"] = data["Ticket"].str.replace('/', '')
 data["Ticket"] = data["Ticket"].str.replace('.', '')
 data[["Ticket_Alpha", "Ticket_Number"]] = data["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
-
+data["Ticket_Alpha"] = data["Ticket_Alpha"].str.upper()
 # data["Ticket_Alpha"] = data["Ticket"].str.extract(r'([A-Za-z]+)')
 # data["Ticket_Number"] = data["Ticket"].str.extract(r'(\d+)')
 print(data[["Ticket", "Ticket_Alpha", "Ticket_Number"]])
