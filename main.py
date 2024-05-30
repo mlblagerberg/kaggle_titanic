@@ -1,14 +1,12 @@
 """
 Project: Kaggle - Titanic Survival Prediction
 Start: May 28th, 2024
-Last touched: May 28th, 2024
+Last touched: May 30th, 2024
 Author: Madeleine L.
 """
 
-import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-import seaborn as sns
 from math import log
 from sklearn.compose import ColumnTransformer
 from sklearn.decomposition import PCA
@@ -28,6 +26,7 @@ median_fare = data["Fare"].median()
 
 
 def data_processing(data_frame):
+    """Takes dataframe as input and performs basic data processing and feature engineering."""
     missing_age_mask = data_frame["Age"].isna()
     data_frame["Fare"] = data_frame["Fare"].fillna(median_fare)
     data_frame["PassengerId"] = data_frame["PassengerId"].astype(object)
@@ -50,6 +49,7 @@ median_age_by_suffix = data.groupby("Suffix")["Age"].median()
 
 
 def impute_age(data_frame):
+    """Takes a dataframe as input and imputes the age of null records based on median age calculated by suffix"""
     missing_age_mask = data_frame["Age"].isna()
     data_frame.loc[missing_age_mask, "Age"] = data_frame.loc[missing_age_mask, "Suffix"].map(median_age_by_suffix)
 
@@ -59,6 +59,7 @@ impute_age(data)
 
 
 def family_score(data_frame):
+    """Takes a dataframe as input and creates a family score to capture the complexities of having family onboard"""
     data_frame["FamilyScore"] = ((((data_frame["SibSp"] + 1) / (data_frame["Parch"] + 1)) / data_frame["Age"])
                                  * data_frame["Pclass"])
     # print(data_frame.sort_values("FamilyScore"))
