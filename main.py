@@ -21,18 +21,26 @@ from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 # -------------------------------------- IMPORT DATA AND PREPROCESS ------------------------------------ #
 data = pd.read_csv("Data/train.csv")
 test_data = pd.read_csv("Data/test.csv")
-# median_age = data["Age"].median()  # 28
-# median_fare = data["Fare"].median()
-# print(data.describe())
 
 
 def data_processing(data_frame):
     """Takes dataframe as input and performs basic data processing and feature engineering."""
 
     data_frame["PassengerId"] = data_frame["PassengerId"].astype(object)
+
+    # Create name and suffix fields and clean data
     data_frame[["LastName", "SuffixFirstName"]] = data_frame["Name"].str.split(",", expand=True)
     data_frame[["Suffix", "FirstName"]] = data_frame["SuffixFirstName"].str.split(".", n=1, expand=True)
     data_frame.drop(columns=["Name", "SuffixFirstName"], inplace=True)
+
+    data_frame["Suffix"] = data_frame["Suffix"].str.strip()
+    data_frame["Suffix"] = data_frame["Suffix"].replace(["Ms", "Miss", "Mlle"], "Miss/Unmarried")
+    data_frame["Suffix"] = data_frame["Suffix"].replace(["Mrs", "Mme"], "Mrs/Marrried")
+    data_frame["Suffix"] = data_frame["Suffix"].replace(["Lady", "the Countess"], "W-Nobility")
+    data_frame["Suffix"] = data_frame["Suffix"].replace(["Jonkheer", "Sir", "Don"], "M-Nobility")
+    data_frame["Suffix"] = data_frame["Suffix"].replace(["Col", "Capt", "Major"], "Military")
+    data_frame["Suffix"] = data_frame["Suffix"].replace(["Dr", "Rev"], "Service")
+
 
     # Simplify and clean Ticket feature
     data_frame["Ticket"] = data_frame["Ticket"].str.replace(' ', '')
@@ -40,14 +48,33 @@ def data_processing(data_frame):
     data_frame["Ticket"] = data_frame["Ticket"].str.replace('.', '')
     data_frame[["TicketAlpha", "TicketNumber"]] = data_frame["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
     data_frame["TicketAlpha"] = data_frame["TicketAlpha"].str.upper()
-    data_frame["TicketAlpha"] = data_frame["TicketAlpha"].fillna("Missing")
+
+    data_frame["Embarked"] = data_frame["Embarked"].fillna("S")
 
     # Simplify and clean Cabin feature
-    data_frame["CabinAlpha"] = data["Cabin"].str.extract(r'([A-Za-z])')
+    data_frame["CabinAlpha"] = data_frame["Cabin"].str.extract(r'([A-Za-z])')
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].fillna("Missing")
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["A", "B", "C", "T"], "ABC")
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["D", "E"], "DE")
     # data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["F", "G"], "FG")
+    data_frame.drop(columns=["Cabin", "Ticket"], inplace=True)
+
+    # Simplify and clean TicketAlpha feature
+    mapping_dict = {
+        1: "PC",
+        2: "CSPS",
+        3: "CA",
+    }
+
+    # Impute nulls to ticketalpha and class with most similar survival rate
+    data_frame['TicketAlpha'] = data_frame.apply(
+        lambda row: mapping_dict[row["Pclass"]] if pd.isnull(row["TicketAlpha"]) else row["TicketAlpha"], axis=1)
+
+    data_frame["TicketAlpha"] = data_frame["TicketAlpha"].replace(["CA", "SCPARIS", "PPP", "SCAH"], "CSPS")
+    data_frame["TicketAlpha"] = data_frame["TicketAlpha"].replace(["SC", "SCAHBASLE", "SWPP"], "HIGH")
+    data_frame["TicketAlpha"] = data_frame["TicketAlpha"].replace(["C", "STONO"], "CSTONO")
+    data_frame["TicketAlpha"] = data_frame["TicketAlpha"].replace(["AS", "FA", "SCA", "SOPP", "SOTONO", "SP", "CASOTON",
+                                                                   "SCOW", "SOP", "FC"], "LOW")
 
 
 
@@ -62,7 +89,6 @@ median_fare_by_pclass = data.groupby("Pclass")["Fare"].median()
 def impute_age_fare(data_frame):
     """Takes a dataframe as input and imputes the age of null records based on median age calculated by pclass"""
     missing_age_mask = data_frame["Age"].isna()
-    # data_frame.loc[missing_age_mask, "Age"] = data_frame.loc[missing_age_mask, "Suffix"].map(median_age_by_suffix)
     data_frame.loc[missing_age_mask, "Age"] = data_frame.loc[missing_age_mask, "Pclass"].map(median_age_by_pclass)
 
     missing_fare_mask = data_frame["Fare"].isna()
@@ -75,9 +101,8 @@ impute_age_fare(test_data)
 
 def family_score(data_frame):
     """Takes a dataframe as input and creates a family score to capture the complexities of having family onboard"""
-    data_frame["FamilyScore"] = ((((data_frame["SibSp"] + 1) / (data_frame["Parch"] + 1)) * data_frame["Age"])
-                                 / (data_frame["Fare"] + 1))
-    # print(data_frame.sort_values("FamilyScore"))
+    data_frame["FamilyScore"] = data_frame["SibSp"] + data_frame["Parch"] + 1
+    data_frame.drop(columns=["SibSp", "Parch"], inplace=True)
 
 
 family_score(data)
@@ -132,12 +157,14 @@ family_score(test_data)
 #
 # # print(data.head(50))
 
-cabin_survival = data["Survived"].groupby(data["CabinAlpha"]).mean()
-print(cabin_survival)
+# cabin_survival = data["Survived"].groupby(data["CabinAlpha"]).mean()
+# print(cabin_survival)
 # cabin_count = data["CabinAlpha"].groupby(data["CabinAlpha"]).count()
 # print(cabin_count)
 # cabin_sum = data["Survived"].groupby(data["CabinAlpha"]).sum()
 # print(cabin_sum)
+# suffix_survival = data["Survived"].groupby(data["Suffix"]).mean()
+# print(suffix_survival)
 
 # grouped_data = data.groupby(['CabinAlpha', 'Pclass']).sum().reset_index()
 # sns.barplot(x="CabinAlpha", y="Survived", hue="Pclass", data=grouped_data)
@@ -146,59 +173,51 @@ print(cabin_survival)
 # plt.ylabel("Survived")
 # plt.show()
 
-grouped_data = data.groupby(['TicketAlpha', 'Pclass']).sum().reset_index()
-sns.barplot(x="Pclass", y="TicketAlpha", hue="Survived", data=grouped_data)
-plt.title("Survived by cabin and class")
-plt.xlabel("Pclass")
-plt.ylabel("TicketAlpha")
-plt.show()
+# data["Pclass"] = data["Pclass"].astype("str")
+# ticket_survival = data.groupby(["Pclass", "TicketAlpha"])["Survived"].mean().reset_index()
+# ticket_survival.to_csv("Data/Pclass_Ticket_Survival_Rate.csv")
+# print(ticket_survival)
+
+# pivot_table = ticket_survival.pivot(index='TicketAlpha', columns='Pclass', values='Survived')
+# grouped_data = data.groupby(['TicketAlpha', 'Pclass']).mean().reset_index()
+# plt.scatter(x="Survived", y="TicketAlpha", c="Pclass", data=ticket_survival)
+#
+# plt.figure(figsize=(10, 6))
+# sns.barplot(x="Survived", y="TicketAlpha", hue="Pclass", data=ticket_survival, ci=None, orient="h")
+# plt.title("Survived by cabin and class")
+# plt.xlabel("Survived")
+# plt.ylabel("TicketAlpha")
+# plt.legend(title='Survived')
+# plt.show()
+
 # -------------------------------------- PREPROCESSING ------------------------------------ #
 
 
 features = ["Pclass",
             "Age",
-            "SibSp",
-            "Parch",
+            "Suffix",
             "Fare",
             "FamilyScore",
             "Sex",
-            # "TicketAlpha",
+            "TicketAlpha",
             "CabinAlpha"
             ]
 
-base_data = data #data.dropna()
-X = (base_data[features]) #.values
-y = base_data["Survived"] #.values
+base_data = data
+X = (base_data[features])
+y = base_data["Survived"]
 
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=44)
-
-# average_column = data.groupby('TicketAlpha')['Survived'].mean().reset_index()
-
-# low_survival = average_column[(average_column["Survived"] <= (1/3))]
-# high_survival = average_column[(average_column["Survived"] >= (2/3))]
-# print("Low survival")
-# print(low_survival["TicketAlpha"].tolist())
-# print("High survival")
-# print(high_survival["TicketAlpha"].tolist())
-
-# encoder = OneHotEncoder(drop='first', handle_unknown="ignore")
-# encoder.fit(data[["TicketAlpha"]])
-# # indices_to_keep = data[data["TicketAlpha"].isin(categories_to_keep)].index
-# encoded_data = encoder.transform(data[["TicketAlpha"]])
-# # encoded_data_filtered = encoded_data[indices_to_keep]
-# # print(encoded_data_filtered)
 
 preprocessor = ColumnTransformer(
     transformers=[
         ('ship', OneHotEncoder(handle_unknown="ignore"), ["Sex"]),
         ('level', OneHotEncoder(), ['CabinAlpha']),
-        # ('sink', OneHotEncoder(handle_unknown="ignore"), ["TicketAlpha"]),
+        ('sink', OneHotEncoder(handle_unknown="ignore"), ["TicketAlpha"]),
         ('nomen', StandardScaler(), ["FamilyScore"]),
         ('lifeboat', StandardScaler(), ["Fare"]),
-        ('ice', StandardScaler(), ["Parch"]),
-        ('burg', StandardScaler(), ["SibSp"]),
+        ('ice', OneHotEncoder(handle_unknown="ignore"), ["Suffix"]),
         ('white', StandardScaler(), ["Age"])
-        # ('star', StandardScaler(), ["LowSurvival"])
     ]
     , remainder='passthrough'  # Keep any remaining columns not specified in transformers as they are
 )
@@ -206,7 +225,7 @@ preprocessor = ColumnTransformer(
 X_train_preprocessed = preprocessor.fit_transform(X_train)
 X_test_preprocessed = preprocessor.transform(X_test)
 
-
+# # -------------------------------------- PCA ANALYSIS ------------------------------------ #
 # pca = PCA()
 # X_pca = pca.fit_transform(X_train_preprocessed)
 #
@@ -221,14 +240,14 @@ X_test_preprocessed = preprocessor.transform(X_test)
 # print("Explained Variance Ratio:", explained_variance_ratio)
 #
 # # -------------------------------------- LOGISTIC REGRESSION FIT ------------------------------------ #
+
 model = LogisticRegression()
 model.fit(X_train_preprocessed, y_train)
 
 lr_y_pred = model.predict(X_test_preprocessed)
 
 lr_accuracy = accuracy_score(y_test, lr_y_pred)
-print(f"Logistic Regression Accuracy: {lr_accuracy}")  # Accuracy: 0.6756756756756757
-# # **************** After removing Embarked, Ticket, and Cabin Accuracy is 0.8108108108108109 **************** #
+print(f"Logistic Regression Accuracy: {lr_accuracy}")  # Baseline Accuracy: 0.6756756756756757
 # # coefficients = model.coef_[0]
 # # for feature, coef in zip(features, coefficients):
 # #     print(f"Feature {feature}: {coef}")
@@ -239,21 +258,14 @@ clf = DecisionTreeClassifier()
 clf.fit(X_train_preprocessed, y_train)
 clf_y_pred = clf.predict(X_test_preprocessed)
 clf_accuracy = accuracy_score(y_test, clf_y_pred)
-print(f"Decision Tree Accuracy: {clf_accuracy}")
+# print(f"Decision Tree Accuracy: {clf_accuracy}")
 #
 # # -------------------------------------- RANDOM FOREST FIT ------------------------------------ #
 rf = RandomForestClassifier(n_estimators=1000)
 rf.fit(X_train_preprocessed, y_train)
 rf_y_pred = rf.predict(X_test_preprocessed)
 rf_accuracy = accuracy_score(y_test, rf_y_pred)
-print(f"Random Forest Accuracy: {rf_accuracy}")
-#
-# # plt.figure()
-# # mean_score = base_data["FamilyScore"].mean()
-# # plt.scatter(base_data["FamilyScore"], base_data["Survived"])
-# # plt.show()
-#
-# # test_data["LowSurvival"] = test_data.apply(low_survival_tickets, axis=1)
+# print(f"Random Forest Accuracy: {rf_accuracy}")
 #
 # X_test = test_data[features]
 # X_test_preprocessed = preprocessor.transform(X_test)
