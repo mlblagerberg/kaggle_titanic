@@ -190,9 +190,7 @@ family_score(test_data)
 # plt.legend(title='Survived')
 # plt.show()
 
-# -------------------------------------- PREPROCESSING ------------------------------------ #
-
-
+# -------------------------------------- MODEL SETUP ------------------------------------ #
 features = ["Pclass",
             "Age",
             "Suffix",
@@ -200,6 +198,7 @@ features = ["Pclass",
             "FamilyScore",
             "Sex",
             "TicketAlpha",
+            "Embarked",
             "CabinAlpha"
             ]
 
@@ -217,10 +216,13 @@ preprocessor = ColumnTransformer(
         ('nomen', StandardScaler(), ["FamilyScore"]),
         ('lifeboat', StandardScaler(), ["Fare"]),
         ('ice', OneHotEncoder(handle_unknown="ignore"), ["Suffix"]),
+        ('burg', OneHotEncoder(handle_unknown="ignore"), ["Embarked"]),
         ('white', StandardScaler(), ["Age"])
     ]
     , remainder='passthrough'  # Keep any remaining columns not specified in transformers as they are
 )
+# print(data.columns)
+# print(features)
 
 X_train_preprocessed = preprocessor.fit_transform(X_train)
 X_test_preprocessed = preprocessor.transform(X_test)
@@ -258,14 +260,14 @@ clf = DecisionTreeClassifier()
 clf.fit(X_train_preprocessed, y_train)
 clf_y_pred = clf.predict(X_test_preprocessed)
 clf_accuracy = accuracy_score(y_test, clf_y_pred)
-# print(f"Decision Tree Accuracy: {clf_accuracy}")
+print(f"Decision Tree Accuracy: {clf_accuracy}")
 #
 # # -------------------------------------- RANDOM FOREST FIT ------------------------------------ #
 rf = RandomForestClassifier(n_estimators=1000)
 rf.fit(X_train_preprocessed, y_train)
 rf_y_pred = rf.predict(X_test_preprocessed)
 rf_accuracy = accuracy_score(y_test, rf_y_pred)
-# print(f"Random Forest Accuracy: {rf_accuracy}")
+print(f"Random Forest Accuracy: {rf_accuracy}")
 #
 # X_test = test_data[features]
 # X_test_preprocessed = preprocessor.transform(X_test)
