@@ -57,7 +57,7 @@ def data_processing(data_frame):
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["A", "B", "C", "T"], "ABC")
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["D", "E"], "DE")
     # data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["F", "G"], "FG")
-    data_frame.drop(columns=["Cabin", "Ticket"], inplace=True)
+    data_frame.drop(columns=["Cabin", "Ticket", "FirstName"], inplace=True)
 
     # Simplify and clean TicketAlpha feature
     mapping_dict = {
@@ -103,10 +103,17 @@ def family_score(data_frame):
     """Takes a dataframe as input and creates a family score to capture the complexities of having family onboard"""
     data_frame["FamilyScore"] = data_frame["SibSp"] + data_frame["Parch"] + 1
     data_frame.drop(columns=["SibSp", "Parch"], inplace=True)
+    # data_frame.loc[data_frame["FamilyScore"] == 1, "FamilySize"] = "Alone"
+    # data_frame.loc[data_frame["FamilyScore"].isin([2, 3, 4]), "FamilySize"] = "Small"
+    # data_frame.loc[data_frame["FamilyScore"].isin([5, 6]), "FamilySize"] = "Medium"
+    # data_frame.loc[data_frame["FamilyScore"] >= 7, "FamilySize"] = "Large"
+    #
+    # data_frame.drop(columns=["FamilyScore"], inplace=True)
 
 
 family_score(data)
 family_score(test_data)
+print(data.head())
 
 # -------------------------------------- DATA EXPLORATION ------------------------------------ #
 # From simple correlation analysis it looks like fare and class influenced survival the most. The higher the fare cost
@@ -195,6 +202,7 @@ features = ["Pclass",
             "Age",
             "Suffix",
             "Fare",
+            # "FamilySize",
             "FamilyScore",
             "Sex",
             "TicketAlpha",
@@ -213,6 +221,7 @@ preprocessor = ColumnTransformer(
         ('ship', OneHotEncoder(handle_unknown="ignore"), ["Sex"]),
         ('level', OneHotEncoder(), ['CabinAlpha']),
         ('sink', OneHotEncoder(handle_unknown="ignore"), ["TicketAlpha"]),
+        # ('nomen', OneHotEncoder(), ["FamilySize"]),
         ('nomen', StandardScaler(), ["FamilyScore"]),
         ('lifeboat', StandardScaler(), ["Fare"]),
         ('ice', OneHotEncoder(handle_unknown="ignore"), ["Suffix"]),
@@ -221,7 +230,7 @@ preprocessor = ColumnTransformer(
     ]
     , remainder='passthrough'  # Keep any remaining columns not specified in transformers as they are
 )
-# print(data.columns)
+print(len(data["TicketNumber"].unique()))
 # print(features)
 
 X_train_preprocessed = preprocessor.fit_transform(X_train)
