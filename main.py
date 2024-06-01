@@ -49,6 +49,8 @@ def data_processing(data_frame):
     data_frame[["TicketAlpha", "TicketNumber"]] = data_frame["Ticket"].str.extract(r'([A-Za-z]+)?(\d+)')
     data_frame["TicketAlpha"] = data_frame["TicketAlpha"].str.upper()
 
+    data_frame["TicketNumberCount"] = data_frame.groupby("TicketNumber")["TicketNumber"].transform('count')
+
     data_frame["Embarked"] = data_frame["Embarked"].fillna("S")
 
     # Simplify and clean Cabin feature
@@ -57,7 +59,7 @@ def data_processing(data_frame):
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["A", "B", "C", "T"], "ABC")
     data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["D", "E"], "DE")
     # data_frame["CabinAlpha"] = data_frame["CabinAlpha"].replace(["F", "G"], "FG")
-    data_frame.drop(columns=["Cabin", "Ticket", "FirstName"], inplace=True)
+    data_frame.drop(columns=["Cabin", "Ticket", "TicketNumber", "FirstName"], inplace=True)
 
     # Simplify and clean TicketAlpha feature
     mapping_dict = {
@@ -105,9 +107,8 @@ def family_score(data_frame):
     data_frame.drop(columns=["SibSp", "Parch"], inplace=True)
     # data_frame.loc[data_frame["FamilyScore"] == 1, "FamilySize"] = "Alone"
     # data_frame.loc[data_frame["FamilyScore"].isin([2, 3, 4]), "FamilySize"] = "Small"
-    # data_frame.loc[data_frame["FamilyScore"].isin([5, 6]), "FamilySize"] = "Medium"
-    # data_frame.loc[data_frame["FamilyScore"] >= 7, "FamilySize"] = "Large"
-    #
+    # data_frame.loc[data_frame["FamilyScore"] > 4, "FamilySize"] = "Large"
+    # #
     # data_frame.drop(columns=["FamilyScore"], inplace=True)
 
 
@@ -196,6 +197,15 @@ print(data.head())
 # plt.ylabel("TicketAlpha")
 # plt.legend(title='Survived')
 # plt.show()
+#
+# ticket_survival = data.groupby(["FamilyScore", "Pclass"])["Survived"].mean().reset_index()
+# plt.figure(figsize=(10, 6))
+# sns.barplot(x="FamilyScore", y="Pclass", hue="Survived", data=ticket_survival, ci=None, orient="h")
+# plt.title("Survival by family score and age.")
+# plt.xlabel("FamilyScore")
+# plt.ylabel("Pclass")
+# plt.legend(title="Survived")
+# plt.show()
 
 # -------------------------------------- MODEL SETUP ------------------------------------ #
 features = ["Pclass",
@@ -230,7 +240,7 @@ preprocessor = ColumnTransformer(
     ]
     , remainder='passthrough'  # Keep any remaining columns not specified in transformers as they are
 )
-print(len(data["TicketNumber"].unique()))
+
 # print(features)
 
 X_train_preprocessed = preprocessor.fit_transform(X_train)
